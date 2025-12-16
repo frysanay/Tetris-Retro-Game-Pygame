@@ -1,4 +1,4 @@
-# 🎮 Retro Tetris – Neon Edition
+# 🎮 Retro Tetris
 
 Project ini merupakan **Game Tetris bertema Neon Retro** yang dikembangkan menggunakan **Python dan Pygame** sebagai bagian dari **Ujian Akhir Semester (UAS)** mata kuliah **Pemrograman Berorientasi Objek (PBO)**.
 
@@ -8,7 +8,7 @@ Fokus utama dari project ini adalah penerapan konsep **Object Oriented Programmi
 
 ## 📌 Deskripsi Singkat
 
-Retro Tetris – Neon Edition adalah adaptasi dari game Tetris klasik dengan tampilan visual neon modern. Game ini memiliki sistem score, level, combo, serta fitur menu, pause, dan game over. Seluruh logika permainan disusun secara modular menggunakan paradigma OOP agar kode lebih terstruktur dan mudah dikembangkan.
+Retro Tetris adalah adaptasi dari game Tetris klasik dengan tampilan visual neon modern. Game ini memiliki sistem score, level, combo, serta fitur menu, pause, dan game over. Seluruh logika permainan disusun secara modular menggunakan paradigma OOP agar kode lebih terstruktur dan mudah dikembangkan.
 
 ---
 
