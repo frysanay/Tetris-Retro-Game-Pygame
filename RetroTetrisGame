@@ -1,0 +1,713 @@
+import pygame
+import random
+import sys
+
+# Inisialisasi Pygame
+pygame.init()
+
+# ============================================
+# KONSTANTA DAN KONFIGURASI
+# ============================================
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 600
+BLOCK_SIZE = 25
+GRID_WIDTH = 10
+GRID_HEIGHT = 20
+GAME_WIDTH = GRID_WIDTH * BLOCK_SIZE
+GAME_HEIGHT = GRID_HEIGHT * BLOCK_SIZE
+SIDEBAR_WIDTH = 250
+
+# Warna Tema Neon (Hitam, Biru Dongker, Purple Neon, Green Neon)
+BLACK = (0, 0, 0)
+DARK_BLUE = (0, 20, 50)
+NEON_PURPLE = (157, 0, 255)
+NEON_GREEN = (0, 255, 65)
+NEON_CYAN = (0, 255, 255)
+NEON_YELLOW = (255, 255, 0)
+NEON_MAGENTA = (255, 0, 255)
+NEON_ORANGE = (255, 102, 0)
+NEON_BLUE = (0, 128, 255)
+WHITE = (255, 255, 255)
+GRAY = (50, 50, 50)
+RED = (255, 0, 0)
+
+# Font
+pygame.font.init()
+# Load custom fonts
+try:
+    FONT_TITLE = pygame.font.Font("tetrominoes.ttf", 64)
+    FONT_LARGE = pygame.font.Font("dogicabold.ttf", 20)
+    FONT_MEDIUM = pygame.font.Font("dogicabold.ttf", 16)
+    FONT_SMALL = pygame.font.Font("dogicabold.ttf", 12)
+except:
+    # Fallback jika font tidak ditemukan
+    FONT_TITLE = pygame.font.Font(None, 64)
+    FONT_LARGE = pygame.font.Font(None, 32)
+    FONT_MEDIUM = pygame.font.Font(None, 24)
+    FONT_SMALL = pygame.font.Font(None, 18)
+
+# ============================================
+# AUDIO
+# ============================================
+pygame.mixer.init()
+try:
+    # Background music - Tetris theme
+    MUSIC_TETRIS = "music-for-puzzle-game-146738.mp3"
+    pygame.mixer.music.set_volume(0.5)
+    
+    # Game over sound
+    SOUND_GAME_OVER = pygame.mixer.Sound("game-over-retro-arcade-game-422478.mp3")
+    SOUND_GAME_OVER.set_volume(0.6)
+except:
+    # Fallback jika audio tidak ditemukan
+    MUSIC_TETRIS = None
+    SOUND_GAME_OVER = None
+
+
+# ============================================
+# PRINSIP OOP 1: ENCAPSULATION
+# Kelas Shape - Menyembunyikan detail implementasi
+# ============================================
+class Shape:
+    """
+    Kelas Shape merepresentasikan setiap piece Tetris
+    Menerapkan Encapsulation dengan atribut private dan getter/setter
+    """
+    
+    # Definisi bentuk untuk setiap tipe tetromino
+    SHAPES = {
+        'I': [
+            [(0, 0), (1, 0), (2, 0), (3, 0)],
+            [(0, 0), (0, 1), (0, 2), (0, 3)],
+            [(0, 0), (1, 0), (2, 0), (3, 0)],
+            [(0, 0), (0, 1), (0, 2), (0, 3)]
+        ],
+        'O': [
+            [(0, 0), (1, 0), (0, 1), (1, 1)],
+            [(0, 0), (1, 0), (0, 1), (1, 1)],
+            [(0, 0), (1, 0), (0, 1), (1, 1)],
+            [(0, 0), (1, 0), (0, 1), (1, 1)]
+        ],
+        'T': [
+            [(1, 0), (0, 1), (1, 1), (2, 1)],
+            [(1, 0), (1, 1), (2, 1), (1, 2)],
+            [(0, 1), (1, 1), (2, 1), (1, 2)],
+            [(1, 0), (0, 1), (1, 1), (1, 2)]
+        ],
+        'S': [
+            [(1, 0), (2, 0), (0, 1), (1, 1)],
+            [(1, 0), (1, 1), (2, 1), (2, 2)],
+            [(1, 0), (2, 0), (0, 1), (1, 1)],
+            [(1, 0), (1, 1), (2, 1), (2, 2)]
+        ],
+        'Z': [
+            [(0, 0), (1, 0), (1, 1), (2, 1)],
+            [(2, 0), (1, 1), (2, 1), (1, 2)],
+            [(0, 0), (1, 0), (1, 1), (2, 1)],
+            [(2, 0), (1, 1), (2, 1), (1, 2)]
+        ],
+        'J': [
+            [(0, 0), (0, 1), (1, 1), (2, 1)],
+            [(1, 0), (2, 0), (1, 1), (1, 2)],
+            [(0, 1), (1, 1), (2, 1), (2, 2)],
+            [(1, 0), (1, 1), (0, 2), (1, 2)]
+        ],
+        'L': [
+            [(2, 0), (0, 1), (1, 1), (2, 1)],
+            [(1, 0), (1, 1), (1, 2), (2, 2)],
+            [(0, 1), (1, 1), (2, 1), (0, 2)],
+            [(0, 0), (1, 0), (1, 1), (1, 2)]
+        ]
+    }
+    
+    COLORS = {
+        'I': NEON_GREEN,
+        'O': NEON_YELLOW,
+        'T': NEON_PURPLE,
+        'S': NEON_CYAN,
+        'Z': NEON_MAGENTA,
+        'J': NEON_BLUE,
+        'L': NEON_ORANGE
+    }
+    
+    def __init__(self, shape_type):
+        """Konstruktor - Inisialisasi atribut private"""
+        self._type = shape_type
+        self._color = self.COLORS[shape_type]
+        self._rotation = 0
+        self._x = GRID_WIDTH // 2 - 2
+        self._y = 0
+    
+    # Getter methods (Encapsulation)
+    def get_type(self):
+        return self._type
+    
+    def get_color(self):
+        return self._color
+    
+    def get_rotation(self):
+        return self._rotation
+    
+    def get_x(self):
+        return self._x
+    
+    def get_y(self):
+        return self._y
+    
+    # Setter methods (Encapsulation)
+    def set_x(self, x):
+        self._x = x
+    
+    def set_y(self, y):
+        self._y = y
+    
+    def set_rotation(self, rotation):
+        self._rotation = rotation
+    
+    def get_blocks(self):
+        """Mendapatkan koordinat blok berdasarkan rotasi saat ini"""
+        return self.SHAPES[self._type][self._rotation]
+    
+    def rotate(self):
+        """Rotasi shape sebesar 90 derajat"""
+        self._rotation = (self._rotation + 1) % 4
+    
+    def get_absolute_blocks(self):
+        """Mendapatkan posisi absolut semua blok di grid"""
+        blocks = self.get_blocks()
+        return [(self._x + bx, self._y + by) for bx, by in blocks]
+
+
+# ============================================
+# PRINSIP OOP 2: INHERITANCE
+# Kelas TetrisGame sebagai parent class
+# ============================================
+class TetrisGame:
+    """
+    Kelas parent untuk game Tetris
+    Menerapkan Inheritance - bisa di-extend untuk variasi game
+    """
+    
+    def __init__(self):
+        """Inisialisasi game state"""
+        self._board = [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
+        self._score = 0
+        self._level = 1
+        self._lines = 0
+        self._combo = 0
+        self._game_over = False
+    
+    # Getter methods
+    def get_board(self):
+        return self._board
+    
+    def get_score(self):
+        return self._score
+    
+    def get_level(self):
+        return self._level
+    
+    def get_lines(self):
+        return self._lines
+    
+    def get_combo(self):
+        return self._combo
+    
+    def is_game_over(self):
+        return self._game_over
+    
+    def check_collision(self, shape, offset_x=0, offset_y=0):
+        """Mengecek apakah shape bertabrakan dengan board atau boundary"""
+        blocks = shape.get_blocks()
+        x = shape.get_x() + offset_x
+        y = shape.get_y() + offset_y
+        
+        for bx, by in blocks:
+            new_x = x + bx
+            new_y = y + by
+            
+            # Cek boundary
+            if new_x < 0 or new_x >= GRID_WIDTH or new_y >= GRID_HEIGHT:
+                return True
+            
+            # Cek collision dengan blok yang sudah ada
+            if new_y >= 0 and self._board[new_y][new_x] is not None:
+                return True
+        
+        return False
+    
+    def merge_shape(self, shape):
+        """Menggabungkan shape ke dalam board"""
+        blocks = shape.get_absolute_blocks()
+        for x, y in blocks:
+            if 0 <= y < GRID_HEIGHT and 0 <= x < GRID_WIDTH:
+                self._board[y][x] = shape.get_color()
+    
+    def clear_lines(self):
+        """Menghapus baris yang penuh dan update score"""
+        lines_cleared = 0
+        y = GRID_HEIGHT - 1
+        
+        while y >= 0:
+            if all(self._board[y][x] is not None for x in range(GRID_WIDTH)):
+                # Hapus baris
+                del self._board[y]
+                self._board.insert(0, [None for _ in range(GRID_WIDTH)])
+                lines_cleared += 1
+            else:
+                y -= 1
+        
+        if lines_cleared > 0:
+            self._lines += lines_cleared
+            self._combo += 1
+            
+            # Scoring system dengan combo multiplier
+            base_scores = [0, 100, 300, 500, 800]
+            self._score += base_scores[lines_cleared] * self._level * self._combo
+            
+            # Level up setiap 10 lines
+            self._level = self._lines // 10 + 1
+        else:
+            self._combo = 0
+        
+        return lines_cleared
+    
+    def set_game_over(self):
+        """Set status game over"""
+        self._game_over = True
+    
+    def reset(self):
+        """Reset game ke kondisi awal"""
+        self._board = [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
+        self._score = 0
+        self._level = 1
+        self._lines = 0
+        self._combo = 0
+        self._game_over = False
+
+
+# ============================================
+# PRINSIP OOP 3: POLYMORPHISM
+# Factory pattern untuk membuat shape berbeda
+# ============================================
+class ShapeFactory:
+    """
+    Factory class untuk membuat shape
+    Menerapkan Polymorphism - setiap shape memiliki behavior berbeda
+    """
+    
+    @staticmethod
+    def create_random_shape():
+        """Membuat shape random dengan behavior berbeda"""
+        shape_types = ['I', 'O', 'T', 'S', 'Z', 'J', 'L']
+        shape_type = random.choice(shape_types)
+        return Shape(shape_type)
+    
+    @staticmethod
+    def create_shape(shape_type):
+        """Membuat shape dengan tipe tertentu"""
+        return Shape(shape_type)
+
+
+# ============================================
+# KELAS MAIN GAME ENGINE
+# ============================================
+class TetrisGameEngine:
+    """Kelas utama untuk menjalankan game"""
+    
+    def __init__(self):
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        pygame.display.set_caption("RETRO TETRIS - NEON EDITION")
+        self.clock = pygame.time.Clock()
+        
+        self.game = TetrisGame()
+        self.current_shape = None
+        self.next_shape = ShapeFactory.create_random_shape()
+        
+        self.game_state = "menu"  # menu, playing, paused, gameover
+        self.drop_time = 0
+        self.drop_speed = 1000  # milliseconds
+        
+        # Play music dari awal
+        if MUSIC_TETRIS:
+            try:
+                pygame.mixer.music.load(MUSIC_TETRIS)
+                pygame.mixer.music.play(-1)  # Loop infinite
+            except:
+                print("Musik tidak dapat dimainkan")
+    
+    def start_game(self):
+        """Memulai game baru"""
+        self.game.reset()
+        self.current_shape = ShapeFactory.create_random_shape()
+        self.next_shape = ShapeFactory.create_random_shape()
+        self.game_state = "playing"
+        self.drop_time = 0
+        
+        # Restart music jika sedang tidak playing
+        if MUSIC_TETRIS and not pygame.mixer.music.get_busy():
+            try:
+                pygame.mixer.music.load(MUSIC_TETRIS)
+                pygame.mixer.music.play(-1)
+            except:
+                print("Musik tidak dapat dimainkan")
+    
+    def move_shape(self, direction):
+        """Menggerakkan shape"""
+        if not self.current_shape or self.game_state != "playing":
+            return
+        
+        if direction == "left":
+            if not self.game.check_collision(self.current_shape, offset_x=-1):
+                self.current_shape.set_x(self.current_shape.get_x() - 1)
+        
+        elif direction == "right":
+            if not self.game.check_collision(self.current_shape, offset_x=1):
+                self.current_shape.set_x(self.current_shape.get_x() + 1)
+        
+        elif direction == "down":
+            if not self.game.check_collision(self.current_shape, offset_y=1):
+                self.current_shape.set_y(self.current_shape.get_y() + 1)
+                return True
+            else:
+                # Shape landed
+                self.game.merge_shape(self.current_shape)
+                self.game.clear_lines()
+                
+                # Spawn next shape
+                self.current_shape = self.next_shape
+                self.current_shape.set_x(GRID_WIDTH // 2 - 2)
+                self.current_shape.set_y(0)
+                self.next_shape = ShapeFactory.create_random_shape()
+                
+                # Check game over
+                if self.game.check_collision(self.current_shape):
+                    self.game.set_game_over()
+                    self.game_state = "gameover"
+                    
+                    # Stop music dan play game over sound
+                    pygame.mixer.music.stop()
+                    if SOUND_GAME_OVER:
+                        try:
+                            SOUND_GAME_OVER.play()
+                        except:
+                            print("Sound effect tidak dapat dimainkan")
+                
+                return False
+        
+        elif direction == "rotate":
+            old_rotation = self.current_shape.get_rotation()
+            self.current_shape.rotate()
+            if self.game.check_collision(self.current_shape):
+                self.current_shape.set_rotation(old_rotation)
+        
+        return False
+    
+    def hard_drop(self):
+        """Jatuhkan shape langsung ke bawah"""
+        while self.move_shape("down"):
+            pass
+    
+    def update(self):
+        """Update game logic"""
+        if self.game_state != "playing":
+            return
+        
+        # Update drop speed berdasarkan level
+        self.drop_speed = max(100, 1000 - (self.game.get_level() - 1) * 50)
+        
+        # Auto drop
+        self.drop_time += self.clock.get_time()
+        if self.drop_time >= self.drop_speed:
+            self.move_shape("down")
+            self.drop_time = 0
+    
+    def draw_block(self, x, y, color, size=BLOCK_SIZE):
+        """Menggambar satu blok dengan efek neon"""
+        rect = pygame.Rect(x, y, size, size)
+        pygame.draw.rect(self.screen, color, rect)
+        pygame.draw.rect(self.screen, BLACK, rect, 2)
+        
+        # Efek glow neon
+        glow_color = tuple(min(255, c + 50) for c in color)
+        pygame.draw.rect(self.screen, glow_color, rect, 1)
+    
+    def draw_board(self):
+        """Menggambar game board"""
+        board_x = 50
+        board_y = 50
+        
+        # Background board
+        pygame.draw.rect(self.screen, DARK_BLUE, 
+                        (board_x, board_y, GAME_WIDTH, GAME_HEIGHT))
+        
+        # Grid lines
+        for x in range(GRID_WIDTH + 1):
+            pygame.draw.line(self.screen, GRAY,
+                           (board_x + x * BLOCK_SIZE, board_y),
+                           (board_x + x * BLOCK_SIZE, board_y + GAME_HEIGHT))
+        for y in range(GRID_HEIGHT + 1):
+            pygame.draw.line(self.screen, GRAY,
+                           (board_x, board_y + y * BLOCK_SIZE),
+                           (board_x + GAME_WIDTH, board_y + y * BLOCK_SIZE))
+        
+        # Draw placed blocks
+        board = self.game.get_board()
+        for y in range(GRID_HEIGHT):
+            for x in range(GRID_WIDTH):
+                if board[y][x] is not None:
+                    self.draw_block(board_x + x * BLOCK_SIZE,
+                                  board_y + y * BLOCK_SIZE,
+                                  board[y][x])
+        
+        # Draw current shape
+        if self.current_shape and self.game_state == "playing":
+            blocks = self.current_shape.get_absolute_blocks()
+            for bx, by in blocks:
+                if by >= 0:
+                    self.draw_block(board_x + bx * BLOCK_SIZE,
+                                  board_y + by * BLOCK_SIZE,
+                                  self.current_shape.get_color())
+        
+        # Border
+        pygame.draw.rect(self.screen, NEON_BLUE,
+                        (board_x - 3, board_y - 3, GAME_WIDTH + 6, GAME_HEIGHT + 6), 3)
+    
+    def draw_sidebar(self):
+        """Menggambar sidebar dengan stats dan next piece"""
+        sidebar_x = GAME_WIDTH + 100
+        y_pos = 80
+        
+        # Title
+        title = FONT_LARGE.render("STATS", True, NEON_PURPLE)
+        self.screen.blit(title, (sidebar_x, y_pos))
+        y_pos += 60
+        
+        # Score
+        score_label = FONT_SMALL.render("SCORE", True, NEON_PURPLE)
+        score_value = FONT_MEDIUM.render(str(self.game.get_score()), True, NEON_GREEN)
+        self.screen.blit(score_label, (sidebar_x, y_pos))
+        self.screen.blit(score_value, (sidebar_x, y_pos + 20))
+        y_pos += 70
+        
+        # Level
+        level_label = FONT_SMALL.render("LEVEL", True, NEON_PURPLE)
+        level_value = FONT_MEDIUM.render(str(self.game.get_level()), True, NEON_BLUE)
+        self.screen.blit(level_label, (sidebar_x, y_pos))
+        self.screen.blit(level_value, (sidebar_x, y_pos + 20))
+        y_pos += 70
+        
+        # Lines
+        lines_label = FONT_SMALL.render("LINES", True, NEON_PURPLE)
+        lines_value = FONT_MEDIUM.render(str(self.game.get_lines()), True, NEON_GREEN)
+        self.screen.blit(lines_label, (sidebar_x, y_pos))
+        self.screen.blit(lines_value, (sidebar_x, y_pos + 20))
+        y_pos += 70
+        
+        # Combo
+        combo_label = FONT_SMALL.render("COMBO", True, NEON_PURPLE)
+        combo_text = f"x{self.game.get_combo()}" if self.game.get_combo() > 0 else "-"
+        combo_value = FONT_MEDIUM.render(combo_text, True, NEON_YELLOW)
+        self.screen.blit(combo_label, (sidebar_x, y_pos))
+        self.screen.blit(combo_value, (sidebar_x, y_pos + 20))
+        y_pos += 80
+        
+        # Next piece
+        next_label = FONT_SMALL.render("NEXT", True, NEON_PURPLE)
+        self.screen.blit(next_label, (sidebar_x, y_pos))
+        y_pos += 35
+        
+        # Draw next piece preview
+        if self.next_shape:
+            preview_x = sidebar_x
+            preview_y = y_pos
+            blocks = self.next_shape.get_blocks()
+            for bx, by in blocks:
+                self.draw_block(preview_x + bx * 20, preview_y + by * 20,
+                              self.next_shape.get_color(), size=20)
+    
+    def draw_menu(self):
+        """Menggambar menu awal dengan efek neon"""
+        # Background gradient effect
+        for i in range(0, SCREEN_HEIGHT, 10):
+            alpha = int(20 * (i / SCREEN_HEIGHT))
+            color = (0, alpha, alpha * 2)
+            pygame.draw.rect(self.screen, color, (0, i, SCREEN_WIDTH, 10))
+        
+        # Title dengan shadow effect
+        # Shadow
+        shadow = FONT_TITLE.render("RETRO TETRIS", True, (50, 0, 100))
+        shadow_rect = shadow.get_rect(center=(SCREEN_WIDTH // 2 + 2, 82))
+        self.screen.blit(shadow, shadow_rect)
+        
+        # Main title
+        title = FONT_TITLE.render("RETRO TETRIS", True, NEON_PURPLE)
+        title_rect = title.get_rect(center=(SCREEN_WIDTH // 2, 80))
+        self.screen.blit(title, title_rect)
+        
+        # Decorative lines
+        pygame.draw.line(self.screen, NEON_CYAN, 
+                        (SCREEN_WIDTH // 2 - 250, 130), 
+                        (SCREEN_WIDTH // 2 + 250, 130), 2)
+        
+        # Start button dengan box
+        start_y = 170
+        button_width = 320
+        button_height = 35
+        button_rect = pygame.Rect(SCREEN_WIDTH // 2 - button_width//2, start_y, button_width, button_height)
+        pygame.draw.rect(self.screen, DARK_BLUE, button_rect)
+        pygame.draw.rect(self.screen, NEON_CYAN, button_rect, 3)
+        
+        # Blinking effect untuk start text
+        blink = int(pygame.time.get_ticks() / 500) % 2
+        if blink:
+            start_text = FONT_MEDIUM.render("PRESS ENTER TO START", True, NEON_CYAN)
+        else:
+            start_text = FONT_MEDIUM.render("PRESS ENTER TO START", True, NEON_YELLOW)
+        start_rect = start_text.get_rect(center=button_rect.center)
+        self.screen.blit(start_text, start_rect)
+        
+        # Controls section
+        controls_y = 240
+        controls_title = FONT_LARGE.render("CONTROLS", True, NEON_PURPLE)
+        controls_title_rect = controls_title.get_rect(center=(SCREEN_WIDTH // 2, controls_y))
+        self.screen.blit(controls_title, controls_title_rect)
+        
+        # Control items dengan layout lebih rapi
+        y_pos = controls_y + 40
+        controls = [
+            ("LEFT RIGHT", "Move Left/Right", NEON_BLUE),
+            ("UP", "Rotate Shape", NEON_GREEN),
+            ("DOWN", "Soft Drop", NEON_YELLOW),
+            ("SPACE", "Hard Drop", NEON_ORANGE),
+            ("P", "Pause Game", NEON_MAGENTA)
+        ]
+        
+        # Lebar box yang sama untuk semua (menyesuaikan LEFT RIGHT)
+        box_width = 120
+        
+        for key, action, color in controls:
+            # Key box - semua sama lebar menyesuaikan LEFT RIGHT
+            key_text = FONT_SMALL.render(key, True, color)
+            key_rect = pygame.Rect(SCREEN_WIDTH // 2 - 170, y_pos, box_width, 20)
+            pygame.draw.rect(self.screen, (20, 20, 40), key_rect)
+            pygame.draw.rect(self.screen, color, key_rect, 2)
+            key_text_rect = key_text.get_rect(center=key_rect.center)
+            self.screen.blit(key_text, key_text_rect)
+            
+            # Action text - posisi konsisten
+            action_text = FONT_SMALL.render(action, True, WHITE)
+            self.screen.blit(action_text, (SCREEN_WIDTH // 2 - 40, y_pos + 3))
+            y_pos += 28
+    
+    def draw_pause(self):
+        """Menggambar overlay pause"""
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        overlay.set_alpha(180)
+        overlay.fill(BLACK)
+        self.screen.blit(overlay, (0, 0))
+        
+        pause_text = FONT_LARGE.render("PAUSED", True, NEON_BLUE)
+        pause_rect = pause_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+        self.screen.blit(pause_text, pause_rect)
+        
+        continue_text = FONT_SMALL.render("Press P to continue", True, NEON_GREEN)
+        continue_rect = continue_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50))
+        self.screen.blit(continue_text, continue_rect)
+    
+    def draw_gameover(self):
+        """Menggambar screen game over"""
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        overlay.set_alpha(180)
+        overlay.fill(BLACK)
+        self.screen.blit(overlay, (0, 0))
+        
+        gameover_text = FONT_LARGE.render("GAME OVER", True, RED)
+        gameover_rect = gameover_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50))
+        self.screen.blit(gameover_text, gameover_rect)
+        
+        score_text = FONT_MEDIUM.render(f"Final Score: {self.game.get_score()}", True, NEON_PURPLE)
+        score_rect = score_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+        self.screen.blit(score_text, score_rect)
+        
+        lines_text = FONT_SMALL.render(f"Lines: {self.game.get_lines()}", True, NEON_BLUE)
+        lines_rect = lines_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40))
+        self.screen.blit(lines_text, lines_rect)
+        
+        restart_text = FONT_MEDIUM.render("Press ENTER to play again", True, NEON_GREEN)
+        restart_rect = restart_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 100))
+        self.screen.blit(restart_text, restart_rect)
+    
+    def draw(self):
+        """Render semua elemen game"""
+        self.screen.fill(BLACK)
+        
+        if self.game_state == "menu":
+            self.draw_menu()
+        else:
+            self.draw_board()
+            self.draw_sidebar()
+            
+            if self.game_state == "paused":
+                self.draw_pause()
+            elif self.game_state == "gameover":
+                self.draw_gameover()
+        
+        pygame.display.flip()
+    
+    def handle_events(self):
+        """Handle input events"""
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return False
+            
+            if event.type == pygame.KEYDOWN:
+                if self.game_state == "menu":
+                    if event.key == pygame.K_RETURN:
+                        self.start_game()
+                
+                elif self.game_state == "playing":
+                    if event.key == pygame.K_LEFT:
+                        self.move_shape("left")
+                    elif event.key == pygame.K_RIGHT:
+                        self.move_shape("right")
+                    elif event.key == pygame.K_DOWN:
+                        self.move_shape("down")
+                    elif event.key == pygame.K_UP:
+                        self.move_shape("rotate")
+                    elif event.key == pygame.K_SPACE:
+                        self.hard_drop()
+                    elif event.key == pygame.K_p:
+                        self.game_state = "paused"
+                        pygame.mixer.music.pause()
+                
+                elif self.game_state == "paused":
+                    if event.key == pygame.K_p:
+                        self.game_state = "playing"
+                        pygame.mixer.music.unpause()
+                
+                elif self.game_state == "gameover":
+                    if event.key == pygame.K_RETURN:
+                        self.start_game()
+        
+        return True
+    
+    def run(self):
+        """Main game loop"""
+        running = True
+        while running:
+            running = self.handle_events()
+            self.update()
+            self.draw()
+            self.clock.tick(60)
+        
+        pygame.quit()
+        sys.exit()
+
+
+# ============================================
+# MAIN PROGRAM
+# ============================================
+if __name__ == "__main__":
+    game = TetrisGameEngine()
+    game.run()
